@@ -56,15 +56,26 @@
         [containerView insertSubview:toViewController.view belowSubview:topViewController.view];
     }
     
-    NSTimeInterval duration = [self transitionDuration:transitionContext];
-    [UIView animateWithDuration:duration animations:^{
-        [UIView setAnimationCurve:UIViewAnimationCurveLinear];
-        if (self.coordinatorAnimations) self.coordinatorAnimations((id<UIViewControllerTransitionCoordinatorContext>)transitionContext);
+    // Only animate if is supposed to do so
+    if (transitionContext.isAnimated) {
+        NSTimeInterval duration = [self transitionDuration:transitionContext];
+        [UIView animateWithDuration:duration animations:^{
+            [UIView setAnimationCurve:UIViewAnimationCurveLinear];
+            if (self.coordinatorAnimations) self.coordinatorAnimations((id <UIViewControllerTransitionCoordinatorContext>) transitionContext);
+            topViewController.view.frame = topViewFinalFrame;
+        }                completion:^(BOOL finished) {
+            if ([transitionContext transitionWasCancelled]) {
+                topViewController.view.frame = [transitionContext initialFrameForViewController:topViewController];
+            }
+            
+            if (self.coordinatorCompletion) self.coordinatorCompletion((id <UIViewControllerTransitionCoordinatorContext>) transitionContext);
+            [transitionContext completeTransition:finished];
+        }];
+    } else {
         topViewController.view.frame = topViewFinalFrame;
-    } completion:^(BOOL finished) {
-        if (self.coordinatorCompletion) self.coordinatorCompletion((id<UIViewControllerTransitionCoordinatorContext>)transitionContext);
-        [transitionContext completeTransition:finished];
-    }];
+        [transitionContext completeTransition:YES];
+        return;
+    }
 }
 
 @end

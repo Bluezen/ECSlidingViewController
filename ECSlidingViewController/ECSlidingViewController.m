@@ -70,6 +70,7 @@
 @synthesize topViewController=_topViewController;
 @synthesize underLeftViewController=_underLeftViewController;
 @synthesize underRightViewController=_underRightViewController;
+@synthesize shadowColor=_shadowColor;
 
 #pragma mark - Constructors
 
@@ -98,6 +99,7 @@
 - (instancetype)initWithTopViewController:(UIViewController *)topViewController {
     self = [self initWithNibName:nil bundle:nil];
     if (self) {
+        [self setup];
         self.topViewController = topViewController;
     }
     
@@ -109,6 +111,8 @@
     self.anchorRightRevealAmount = 276;
     _currentTopViewPosition = ECSlidingViewControllerTopViewPositionCentered;
     self.transitionInProgress = NO;
+    self.useShadow = YES;
+    self.shadowColor = [UIColor blackColor];
 }
 
 #pragma mark - UIViewController
@@ -132,7 +136,11 @@
     if (!self.topViewController) [NSException raise:@"Missing topViewController"
                                              format:@"Set the topViewController before loading ECSlidingViewController"];
     self.topViewController.view.frame = [self topViewCalculatedFrameForPosition:self.currentTopViewPosition];
-    [self.view addSubview:self.topViewController.view];
+    if (![self.view.subviews containsObject:self.topViewController.view]) {
+        [self addChildViewController:self.topViewController];
+        [self.view addSubview:self.topViewController.view];
+        [self.topViewController didMoveToParentViewController:self];
+    }
 }
 
 - (void)viewWillAppear:(BOOL)animated {
@@ -185,6 +193,7 @@
         self.topViewController.view.frame = [self topViewCalculatedFrameForPosition:self.currentTopViewPosition];
         self.underLeftViewController.view.frame = [self underLeftViewCalculatedFrameForTopViewPosition:self.currentTopViewPosition];
         self.underRightViewController.view.frame = [self underRightViewCalculatedFrameForTopViewPosition:self.currentTopViewPosition];
+        [self redrawShadowLayer];
     }
 }
 
@@ -244,6 +253,9 @@
 #pragma mark - Properties
 
 - (void)setTopViewController:(UIViewController *)topViewController {
+    if (_topViewController == topViewController)
+        return;
+    
     UIViewController *oldTopViewController = _topViewController;
     
     [oldTopViewController.view removeFromSuperview];
@@ -255,15 +267,45 @@
     _topViewController = topViewController;
     
     if (_topViewController) {
-        [self addChildViewController:_topViewController];
-        [_topViewController didMoveToParentViewController:self];
         
-        if ([self isViewLoaded]) {
+        if ([self isViewLoaded] && ![self.view.subviews containsObject:_topViewController.view]) {
+            [self addChildViewController:_topViewController];
+            [_topViewController didMoveToParentViewController:self];
             [_topViewController beginAppearanceTransition:YES animated:NO];
             [self.view addSubview:_topViewController.view];
             [_topViewController endAppearanceTransition];
         }
+        
+        if ([self useShadow])
+        {
+            [self redrawShadowLayer];
+        }
+
     }
+}
+
+-(void)setShadowColor:(UIColor *)shadowColor
+{
+    if (shadowColor != _shadowColor) {
+        _shadowColor = shadowColor;
+        
+        if (self.useShadow) {
+            [self redrawShadowLayer];
+        }
+    }
+}
+
+-(void)redrawShadowLayer
+{
+    CALayer *layer = _topViewController.view.layer;
+    layer.shadowOffset = CGSizeMake(0, 0);
+    layer.shadowColor = [self.shadowColor CGColor];
+    layer.shadowRadius = 4.0f;
+    layer.shadowOpacity = 0.80f;
+    layer.masksToBounds = NO;
+    CGRect rect = layer.bounds;
+    rect.size.width = 3.f;
+    layer.shadowPath = [[UIBezierPath bezierPathWithRect:rect] CGPath];
 }
 
 - (void)setUnderLeftViewController:(UIViewController *)underLeftViewController {
@@ -861,6 +903,14 @@
     self.view.userInteractionEnabled = YES;
     [UIViewController attemptRotationToDeviceOrientation];
     [self setNeedsStatusBarAppearanceUpdate];
+}
+
+- (UIView *)viewForKey:(NSString *)key {
+    return nil;
+}
+
+- (CGAffineTransform)targetTransform {
+    return CGAffineTransformIdentity;
 }
 
 - (void)setTransitionInProgress:(BOOL)transitionInProgress
